@@ -1,0 +1,33 @@
+GENRES_MANGA:
+- !!python/tuple
+  - '3'
+  - horror
+- !!python/tuple
+  - '5'
+  - comedy
+- !!python/tuple
+  - '7'
+  - fantasy
+GENRES_STORY:
+- !!python/tuple
+  - '1'
+  - horror
+- !!python/tuple
+  - '2'
+  - comedy
+- !!python/tuple
+  - '7'
+  - fantasy
+LOGIN:
+  login_api: https://mc-fhrap972wndb.davinosoft.com.vn/auth/login/
+MANGA:
+  manga_api: https://mc-fhrap972wndb.davinosoft.com.vn/manga/manga/
+MANGA_CHAPTER:
+  manga_chapter_api: https://mc-fhrap972wndb.davinosoft.com.vn/manga/manga/
+MANGA_MEDIA:
+  manga_media_api: https://mc-fhrap972wndb.davinosoft.com.vn/manga/media/
+STORY:
+  story_api:
+  - https://mc-fhrap972wndb.davinosoft.com.vn/story/stories/
+STORY_CHAPTER:
+  story_chapter_api: https://mc-fhrap972wndb.davinosoft.com.vn/story/chapters/

@@ -4,51 +4,30 @@ import random
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import yaml
 from requests_html import HTMLSession
 
-# GLOBAL VARIABLES
-API_LOGIN = "https://mc-fhrap972wndb.davinosoft.com.vn/auth/login/"
-API_MANGA = "https://mc-fhrap972wndb.davinosoft.com.vn/manga/manga/"
-API_CHAPTER = "https://mc-fhrap972wndb.davinosoft.com.vn/manga/chapters/"
-API_MEDIA = "https://mc-fhrap972wndb.davinosoft.com.vn/manga/media/"
-# API_LOGIN = "http://127.0.0.1:8000/auth/login/"
-# API_MANGA =  "http://127.0.0.1:8000/manga/manga/"
-# API_CHAPTER = "http://127.0.0.1:8000/manga/chapters/"
-# API_MEDIA = "http://127.0.0.1:8000/manga/media/"
 FOLDER_STORAGE = "storages"
 PATH_STORAGE = os.path.join(os.getcwd(), FOLDER_STORAGE)
-LIST_TUPLE_GENRES = [
-    (1, "Drama"),
-    (2, "Fantasy"),
-    (3, "Comedy"),
-    (4, "Action"),
-    (5, "Slice of Life"),
-    (6, "Romance"),
-    (7, "Superhero"),
-    (8, "Sic-fi"),
-    (9, "Thriller"),
-    (14, "Supernatural"),
-    (16, "Mystery"),
-    (17, "Sport"),
-    (18, "historical"),
-    (19, "Heart-warming"),
-    (20, "horror"),
+# Loaded file general_config/config.yaml
+with open(os.path.join("general_config", "config.yaml"), "r") as f:
+    CONFIG = yaml.load(f, Loader=yaml.FullLoader)
+
+LIST_TUPLE_GENRES = CONFIG["GENRES_MANGA"]
+API_LOGIN = CONFIG["LOGIN"]["login_api"]
+API_MANGA = CONFIG["MANGA"]["manga_api"]
+API_CHAPTER = CONFIG["MANGA_CHAPTER"]["manga_chapter_api"]
+API_MEDIA = CONFIG["MANGA_MEDIA"]["manga_media_api"]
+LIST_OF_SCHEDULE = [
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
 ]
 
-"""
-    Structure of json save upload data:
-    {
-        f"{comic_name}": {
-            "manga_id": 1,
-            "total_chapters": 1,
-            "total_chapter_upload": 1,
-            "chapters": [{
-                "chapter_id": 1,
-                "media_id": [1, 2, 3]
-                "total_images": 3,
-            }]
-    }
-"""
 
 
 class TransferDataReadComicOnline:
