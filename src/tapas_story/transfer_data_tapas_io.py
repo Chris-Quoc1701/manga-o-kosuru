@@ -2,36 +2,23 @@ import json
 import os
 import random
 import time
+import yaml
 
 from requests_html import HTMLSession
 from utils.resize_image import reduce_size_image
 
+# Loaded file general_config/config.yaml
+with open(os.path.join("general_config", "config.yaml"), "r") as f:
+    CONFIG = yaml.load(f, Loader=yaml.FullLoader)
+
 # GLOBAL VARIABLES
-API_LOGIN = "https://mc-fhrap972wndb.davinosoft.com.vn/auth/login/"
-API_MANGA = "https://mc-fhrap972wndb.davinosoft.com.vn/story/stories/"
-API_CHAPTER = "https://mc-fhrap972wndb.davinosoft.com.vn/story/chapters/"
+API_LOGIN = CONFIG["LOGIN"]["login_api"]
+API_STORY = CONFIG["STORY"]["story_api"]
+API_CHAPTER = CONFIG["STORY_CHAPTER"]["story_chapter_api"]
 FOLDER_STORAGE = "storages"
 PATH_STORAGE = os.path.join(os.getcwd(), FOLDER_STORAGE)
 
-LIST_TUPLE_GENRES = [
-    (1, "Drama"),
-    (2, "Comedy"),
-    (3, "Comedy"),
-    (11, "Action"),
-    (5, "Non-fiction"),
-    (6, "Romance"),
-    (9, "GL"),
-    (7, "Science fiction"),
-    (8, "Slice of life"),
-    (10, "BL"),
-    (4, "Mystery"),
-    (12, "Thriller"),
-    (14, "Superhero"),
-    (13, "Adventure"),
-    (3, "Horror"),
-    (15, "Supernatural"),
-    (16, "Fantasy"),
-]
+LIST_TUPLE_GENRES = CONFIG["GENRES_STORY"]
 
 LIST_OF_SCHEDULE = [
     "monday",
@@ -134,7 +121,7 @@ class TransferDataTapasIO:
                 )
             )
         response = self.session.post(
-            API_MANGA, data=payload, files=files, headers=self.headers
+            API_STORY, data=payload, files=files, headers=self.headers
         )
         if not response.ok:
             print(response.json())
