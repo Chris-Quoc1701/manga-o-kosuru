@@ -4,6 +4,7 @@ import sys
 
 import toomics_v1
 import transfer_data_toomics
+from utils import clear_all_image_content
 
 
 def main():
@@ -12,6 +13,7 @@ def main():
     Two Options:
     1. Scrape data from toomics.com
     2. Transfer data from scraping to API server
+    3. Clear data from scraping exclude upload.json
     """
     )
     # 2 Options choice scraping data
@@ -22,6 +24,12 @@ def main():
         "-t",
         "--transfer",
         help="Transfer data from scraping to API server",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-cls",
+        "--clear",
+        help="Clear data from scraping exclude upload.json",
         action="store_true",
     )
     # if scrape option is selected we need number page contain lsit comics and how many chapter
@@ -35,7 +43,6 @@ def main():
     # if transfer option is selected then we need email, password and number chapter for transfer
     parser.add_argument("-E", "--email", help="Email login")
     parser.add_argument("-P", "--password", help="Password login")
-    parser.add_argument("-C", "--CHAPTER", help="Number chapter for transfer")
     # if scrape with premium account for Scraping with premium account
     parser.add_argument("-ep", "--email_premium", help="Email login of premium account")
     parser.add_argument(
@@ -44,31 +51,28 @@ def main():
 
     args = parser.parse_args()
     if args.scrape:
-        if (
-            args.chapter
-            and args.warning
-            and args.email_premium
-            and args.password_premium
-        ):
+        if args.chapter and args.email_premium and args.password_premium:
             scrape = toomics_v1.ScrapeToomics(
                 email=args.email_premium,
                 password=args.password_premium,
                 number_chapter=int(args.chapter),
-                mature=True if args.warning == "yes" else False,
+                mature=True if args.warning else False,
             )
-            scrape.begin_scraping()
+            scrape.suffer_comic()
         else:
             print("Please enter all arguments")
     elif args.transfer:
-        if args.email and args.password and args.CHAPTER:
+        if args.email and args.password and args.chapter:
             transfer = transfer_data_toomics.TransferDataToomics(
                 email=args.email,
                 password=args.password,
-                number_chapter=int(args.CHAPTER),
+                number_chapter=int(args.chapter),
             )
             transfer.begin_transfer()
         else:
             print("Please enter all arguments")
+    elif args.clear:
+        clear_all_image_content()
     else:
         print("Please enter all arguments")
 

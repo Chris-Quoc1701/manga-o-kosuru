@@ -1,13 +1,13 @@
 import json
 import os
-import random
 import string
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from requests_html import HTMLSession
+from utils import reduce_size_image
 
 NAME_ROOT = "storages"
 CURRENT_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -46,7 +46,7 @@ def remove_punctuation(text: str) -> str:
 
 class ScraperTapasStory:
     def __init__(
-        self, email: str, password: str, number_page: int, number_chapter: int
+        self, email: str, password: str, page_number: int, number_chapter: int
     ):
         self.session = HTMLSession()
         self.headers = {
@@ -60,7 +60,7 @@ class ScraperTapasStory:
         }
         self.email = email
         self.password = password
-        self.number_page = number_page
+        self.page_number = page_number
         self.number_chapter = number_chapter
 
     def login(self):
@@ -255,10 +255,10 @@ class ScraperTapasStory:
                 )
         return chapter
 
-    def begin_suffer(self):
+    def suffer_story(self):
         self.login()
         print(self.headers)
-        list_url = self.get_list_story(page=6)
+        list_url = self.get_list_story(page=self.page_number)
         for url in list_url:
             story = self.get_information_story(url)
             file_info = "info.json"
@@ -269,16 +269,25 @@ class ScraperTapasStory:
             else:
                 with open(f"{path_story}/{file_info}", "w") as f:
                     json.dump(story.__dict__, f, indent=4)
-            self.download_image(
-                url=story.cover, path=path_story, filename="cover.jpg"
-            ) if story.cover else None
-            self.download_image(
-                url=story.thumbnail, path=path_story, filename="thumbnail.jpg"
-            ) if story.thumbnail else None
+            story.cover = (
+                self.download_image(
+                    url=story.cover, path=path_story, filename="cover.jpg"
+                )
+                if story.cover
+                else None
+            )
+            path_thumbnail = (
+                self.download_image(
+                    url=story.thumbnail, path=path_story, filename="thumbnail.jpg"
+                )
+                if story.thumbnail
+                else None
+            )
+            story.thumbnail = reduce_size_image(path_image=path_thumbnail)
             if story is None:
                 continue
             list_chapter = self.get_list_chapter(
-                story=story, max_limit=20, page=self.number_page
+                story=story, max_limit=20, page=self.number_chapter
             )
             index_chapter = story.total_get_chapter
             for index, chapter_id in enumerate(

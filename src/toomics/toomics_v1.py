@@ -7,10 +7,9 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from bs4 import BeautifulSoup
-from PIL import Image
 from playwright.sync_api import sync_playwright
-from requests.auth import HTTPDigestAuth
 from requests_html import HTMLSession
+from utils import combine_image
 
 
 @dataclass
@@ -261,28 +260,13 @@ class ScrapeToomics(CheckIp):
                         file.write(chunk)
             return path
 
-    def combine_image(self, back, front, path_save) -> str:
-        # Combine image
-        back = Image.open(back)
-        front = Image.open(front)
-        # convert front image to RGBA
-        front = front.convert("RGBA")
-        # resize back image
-        back = back.resize(front.size)
-        # combine image
-        back.paste(front, (0, 0), front)
-        # save image
-        path = os.path.join(path_save, "cover_combine.jpg")
-        back.save(path, "JPEG", quality=92)
-        return path
-
     def parser_content(self, html):
         images = []
         soup = BeautifulSoup(html, "html.parser")
         thumbnail = soup.select_one("meta[property='og:image']").attrs["content"]
         info = soup.select_one("div.viewer-title")
         # name chapter inside info is a tag with attribute title="List"
-        name = info.find("a", title="List").text
+        name = info.find("a", title="List").getText(separator=" ")
         # number chapter inside info is em tag
         number = info.select_one("em").text
         container_image = soup.select("div.viewer-imgs")
@@ -297,7 +281,7 @@ class ScrapeToomics(CheckIp):
                 else:
                     print("Not found url image")
         chapter = Chapter(
-            name=" ".join(name.strip().split()),
+            name=name,
             path_thumbnail=thumbnail,
             number=number,
             images=images,
@@ -382,10 +366,10 @@ class ScrapeToomics(CheckIp):
                 time.sleep(6)
                 return future.result()
 
-    def begin_scraping(self):
+    def suffer_comic(self):
         with sync_playwright() as p:
             browser = p.firefox.launch(
-                headless=False,
+                headless=True,
             )
             # Check storage state is exist
             if os.path.exists("storage_state_pre_2.json"):
@@ -517,7 +501,7 @@ class ScrapeToomics(CheckIp):
                         url=toon.url_foreground,
                         path_save=path_toon,
                     )
-                    toon.path_cover = self.combine_image(
+                    toon.path_cover = combine_image(
                         back=back_ground, front=fore_ground, path_save=path_toon
                     )
                     # Create file info.json
@@ -535,22 +519,39 @@ class ScrapeToomics(CheckIp):
                         break
                     url_content = f"https://toomics.com{chapter_url}"
                     folder_name = f"chapter_{index}"
-                    # check path chapter exist in path toon
+                    # check path chapter exist in path toon and check chapter.json
                     path_chapter = os.path.join(path_toon, folder_name)
-                    print(path_chapter)
-                    if os.path.exists(path_chapter):
+                    if os.path.exists(path_chapter) and os.path.exists(
+                        f"{path_chapter}/chapter.json"
+                    ):
                         path_chapter = os.path.join(path_toon, folder_name)
                         # loaded data from chapter.json
-                        with open(f"{path_chapter}/chapter.json", "r") as f:
-                            chapter = Chapter(**json.load(f))
+                        try:
+                            with open(f"{path_chapter}/chapter.json", "r") as f:
+                                chapter = Chapter(**json.load(f))
+                        except:
+                            os.rmdir(path=path_chapter)
+                            return None
                     else:
                         # Create folder chapter
-                        os.mkdir(path_chapter)
+                        os.mkdir(path_chapter) if not os.path.exists(
+                            path_chapter
+                        ) else None
                         # Get content chapter
                         page.goto(
                             url=url_content,
                             timeout=9000000,
                         )
+                        # check url page is != url_content
+                        if page.url != url_content:
+                            print("Content is not free")
+                            # remove folder chapter
+                            os.rmdir(path_chapter)
+                            # update total_get
+                            toon.total_get = index
+                            self.save_json(toon=toon, path_toon=path_toon)
+                            break
+                        # click button change to viewer/S
                         button = page.query_selector(".viewer-method-toggle")
                         if button:
                             # get attribute href of button
@@ -568,7 +569,6 @@ class ScrapeToomics(CheckIp):
                         # get content html
                         html = page.content()
                         chapter = self.parser_content(html=html)
-                        print(chapter.images)
                         # Download thumbnail
                         chapter.path_thumbnail = self.download_thumb_cover(
                             name="thumbnail",

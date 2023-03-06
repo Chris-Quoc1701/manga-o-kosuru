@@ -1,4 +1,3 @@
-import codecs
 import json
 import os
 import string
@@ -8,7 +7,6 @@ from dataclasses import asdict, dataclass
 import requests_html
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
-from requests.auth import HTTPBasicAuth
 from requests_html import HTMLSession
 
 NAME_ROOT = "storages"
@@ -47,8 +45,15 @@ def remove_punctuation(text: str) -> str:
     return new_text
 
 
+def check_storages_folder() -> None:
+    # Check storages folder is exist
+    if not os.path.exists(ROOT_PATH):
+        os.mkdir(ROOT_PATH)
+    return ROOT_PATH
+
+
 class ScraperReadComicsOnline:
-    def __init__(self, page: int, chapter: int):
+    def __init__(self, page_number: int, number_chapter: int):
         self.session = HTMLSession()
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
@@ -61,9 +66,11 @@ class ScraperReadComicsOnline:
             "Content-Type": "text/html; charset=utf-8",
             "Content-Encoding": "gzip, deflate",
         }
-        self.storages = ROOT_PATH
-        self.page = page
-        self.chapter = chapter
+        self.storages = (
+            ROOT_PATH if os.path.exists(ROOT_PATH) else check_storages_folder()
+        )
+        self.page = page_number
+        self.chapter = number_chapter
 
     def download_image(self, url: str, filename: str, path: str) -> str:
         # check thumbnail is exist
@@ -268,6 +275,8 @@ class ScraperReadComicsOnline:
 
             # get total chapters
             total_chapters = len(chapters)
+            # Reverse chapters
+            chapters = chapters[::-1]
             # create comic folder
             comic_folder = self.create_folder_comic(comic_title)
             # check if comic.json is exist in comic folder

@@ -1,8 +1,10 @@
-import os
-import yaml
 import argparse
+import os
+
+import yaml
 
 FOLDER_SETTING = "general_config"
+
 
 class Config:
     def __init__(self):
@@ -15,18 +17,18 @@ class Config:
         self.config_yaml["STORY"] = {}
         self.config_yaml["STORY_CHAPTER"] = {}
         self.config_yaml["LOGIN"] = {}
-    
+
     def create_section_genre(self, args):
         # check args.genre is manga or story
         if args.genres_manga and args.id_genres:
             # update list of tuple genre [(genre_id, genre_name), ...]
             list_tuple_genre = list(zip((args.id_genres), args.genres_manga))
-            self.config_yaml["GENRES_MANGA"]= list_tuple_genre
+            self.config_yaml["GENRES_MANGA"] = list_tuple_genre
 
         if args.genres_story and args.id_genres:
             # update list of tuple genre [(genre_id, genre_name), ...]
             list_tuple_genre = list(zip((args.id_genres), args.genres_story))
-            self.config_yaml["GENRES_STORY"]= list_tuple_genre
+            self.config_yaml["GENRES_STORY"] = list_tuple_genre
 
     def create_section_manga(self, args):
         if args.mangas:
@@ -67,11 +69,11 @@ class Config:
         with open(os.path.join(FOLDER_SETTING, "config.yaml"), "w") as f:
             yaml.dump(self.config_yaml, f)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Create config file for first time run app",
         formatter_class=argparse.RawTextHelpFormatter,
-        
     )
     parser.add_argument(
         "-h2",
@@ -116,7 +118,7 @@ if __name__ == "__main__":
         "-gid",
         "--id_genres",
         nargs="+",
-        help="Genres id", 
+        help="Genres id",
     )
     parser.add_argument(
         "-m",
@@ -140,7 +142,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-s",
         "--story",
-        nargs="+",
+        action="store",
         help="Story api",
     )
     parser.add_argument(
@@ -156,7 +158,6 @@ if __name__ == "__main__":
         help="Login api",
     )
     args = parser.parse_args()
-
 
     config = Config()
     config.create_config_file(args)

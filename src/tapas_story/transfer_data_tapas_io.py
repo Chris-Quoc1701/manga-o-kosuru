@@ -2,21 +2,22 @@ import json
 import os
 import random
 import time
-import yaml
 
+import yaml
 from requests_html import HTMLSession
-from utils.resize_image import reduce_size_image
+
+FOLDER_STORAGE = "storages"
+PATH_STORAGE = os.path.join(os.getcwd(), FOLDER_STORAGE)
+PATH_PROJECT = os.path.dirname(os.path.dirname(os.getcwd()))
+PATH_CONFIG = os.path.join(PATH_PROJECT, "general_config")
 
 # Loaded file general_config/config.yaml
-with open(os.path.join("general_config", "config.yaml"), "r") as f:
+with open(f"{PATH_CONFIG}/config.yaml", "r") as f:
     CONFIG = yaml.load(f, Loader=yaml.FullLoader)
-
 # GLOBAL VARIABLES
 API_LOGIN = CONFIG["LOGIN"]["login_api"]
 API_STORY = CONFIG["STORY"]["story_api"]
 API_CHAPTER = CONFIG["STORY_CHAPTER"]["story_chapter_api"]
-FOLDER_STORAGE = "storages"
-PATH_STORAGE = os.path.join(os.getcwd(), FOLDER_STORAGE)
 
 LIST_TUPLE_GENRES = CONFIG["GENRES_STORY"]
 
@@ -83,7 +84,6 @@ class TransferDataTapasIO:
             "summary": data["summary"],
             "genre": genres,
             "status": "published",
-            # Choice multi from 1 to 3
             "schedules": schedules,
         }
         basename_thumbnail = os.path.basename(data["thumbnail"])
@@ -120,6 +120,7 @@ class TransferDataTapasIO:
                     (basename_thumbnail, open(path_thumbnail, "rb"), "image/jpeg"),
                 )
             )
+
         response = self.session.post(
             API_STORY, data=payload, files=files, headers=self.headers
         )
@@ -174,17 +175,13 @@ class TransferDataTapasIO:
             list_json_chapter = sorted(
                 list_json_chapter, key=lambda x: int(x.split("_")[1].split(".")[0])
             )
-            print(list_json_chapter)
             total_chapter = len(list_json_chapter)
             file_save = "upload.json"
             file_save = os.path.join(folder_story, file_save)
-            print(file_save)
+
             # Get path thumbnail and cover
             path_thumbnail = os.path.join(folder_story, "thumbnail.jpg")
             path_cover = os.path.join(folder_story, "cover.jpg")
-            # check thumbnail has size above 100kb
-            if os.path.getsize(path_thumbnail) > 100000:
-                reduce_size_image(path_thumbnail, 100000)
             # load file info.json
             with open(os.path.join(folder_story, "info.json"), "r") as f:
                 story_data = json.load(f)
@@ -226,7 +223,9 @@ class TransferDataTapasIO:
             # Get total upload
             total_upload = story["total_upload"]
             # Sort list json chapter
-            for index, chapter in enumerate(list_json_chapter[total_upload:]):
+            for index, chapter in enumerate(
+                list_json_chapter[total_upload:], start=total_upload
+            ):
                 if index > self.number_chapter:
                     break
                 path_json_chapter = os.path.join(folder_story, chapter)
