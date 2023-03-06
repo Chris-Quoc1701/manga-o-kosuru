@@ -6,13 +6,17 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import yaml
 from requests_html import HTMLSession
+from utils import check_image_size
 
 FOLDER_STORAGE = "storages"
 PATH_STORAGE = os.path.join(os.getcwd(), FOLDER_STORAGE)
-# Loaded file general_config/config.yaml
-with open(os.path.join("general_config", "config.yaml"), "r") as f:
-    CONFIG = yaml.load(f, Loader=yaml.FullLoader)
 
+PATH_PROJECT = os.path.dirname(os.path.dirname(os.getcwd()))
+PATH_CONFIG = os.path.join(PATH_PROJECT, "general_config")
+
+# Loaded file config in manga-o-kosuru/genral_config/config.yaml
+with open(f"{PATH_CONFIG}/config.yaml", "r") as f:
+    CONFIG = yaml.load(f, Loader=yaml.FullLoader)
 LIST_TUPLE_GENRES = CONFIG["GENRES_MANGA"]
 API_LOGIN = CONFIG["LOGIN"]["login_api"]
 API_MANGA = CONFIG["MANGA"]["manga_api"]
@@ -29,7 +33,6 @@ LIST_OF_SCHEDULE = [
 ]
 
 
-
 class TransferDataReadComicOnline:
     def __init__(self, email: str, password: str, number_chapter: int):
         self.email = email
@@ -41,6 +44,8 @@ class TransferDataReadComicOnline:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
             "Connection": "keep-alive",
             "Accept": "*/*",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Language": "en-US,en;q=0.9",
         }
         self.number_chapter = number_chapter
 
@@ -109,27 +114,32 @@ class TransferDataReadComicOnline:
         self.headers.pop("Content-Type")
         path_thumbnail = os.path.join(data["thumbnail"])
         genres = self.choice_genre(data["genres"])
+        # choice 1-3 schedule
+        schedules = random.sample(LIST_OF_SCHEDULE, random.randint(1, 3))
         payload = {
             "name": data["title"],
             "summary": data["summary"],
             "genre": genres,
             "status": "published",
+            "schedules": schedules,
         }
         print("Create manga: ", data["title"])
-        files = [
-            ("thumbnail", ("thumbnail.jpg", open(path_thumbnail, "rb"), "image/jpeg")),
-            (
-                "vertical_thumbnail",
-                ("thumbnail.jpg", open(path_thumbnail, "rb"), "image/jpeg"),
-            ),
-            ("cover", ("thumbnail.jpg", open(path_thumbnail, "rb"), "image/jpeg")),
-            (
-                "mobile_cover",
-                ("thumbnail.jpg", open(path_thumbnail, "rb"), "image/jpeg"),
-            ),
-        ]
+        # send only thumbnail
         response = self.session.post(
-            API_MANGA, data=payload, headers=self.headers, files=files, timeout=(10, 20)
+            API_MANGA,
+            data=payload,
+            headers=self.headers,
+            files={
+                "thumbnail": (
+                    "thumbnail.jpg",
+                    open(path_thumbnail, "rb"),
+                    "image/jpeg",
+                ),
+                "vertical_thumbnail": "",
+                "cover": ("thumbnail.jpg", open(path_thumbnail, "rb"), "image/jpeg"),
+                "mobile_cover": "",
+            },
+            timeout=(10, 20),
         )
         if not response.ok:
             print(response.json())
@@ -148,6 +158,7 @@ class TransferDataReadComicOnline:
             "manga": id_manga,
             "is_free": True,
             "status": "published",
+            "number": chapter_name.split(" ")[1],
         }
         files = [
             ("thumbnail", ("thumbnail.jpg", open(path_thumbnail, "rb"), "image/jpeg")),
@@ -257,6 +268,7 @@ class TransferDataReadComicOnline:
             total_chapter = len(folders_chapter)
             # path to thumbnail of comic
             path_thumbnail = os.path.join(path_comic, "thumbnail.jpg")
+            path_thumbnail = check_image_size(path_thumbnail)
             self.path_comic = path_comic
             data_comic["thumbnail"] = path_thumbnail
             # save progess upload

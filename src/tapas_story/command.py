@@ -30,7 +30,6 @@ def main():
     # if transfer option is selected then we need email, password and number chapter for transfer
     parser.add_argument("-E", "--EMAIL", help="Email login")
     parser.add_argument("-P", "--PASSWORD", help="Password login")
-    parser.add_argument("-C", "--CHAPTER", help="Number chapter for transfer")
     # if scrape with premium account for Scraping with premium account
     parser.add_argument("-ep", "--email_premium", help="Email login of premium account")
     parser.add_argument(
@@ -44,16 +43,16 @@ def main():
                 email=args.email_premium,
                 password=args.password_premium,
                 number_chapter=int(args.chapter),
-                number_page=int(args.page),
+                page_number=int(args.page),
             )
-            scraper.begin_suffer()
+            scraper.suffer_story()
         else:
             print("Please enter number page and number chapter")
             sys.exit(1)
     elif args.transfer:
-        if args.EMAIL and args.PASSWORD and args.CHAPTER:
+        if args.EMAIL and args.PASSWORD and args.chapter:
             transfer = transfer_data_tapas_io.TransferDataTapasIO(
-                number_chapter=int(args.CHAPTER),
+                number_chapter=int(args.chapter),
                 email=args.EMAIL,
                 password=args.PASSWORD,
             )

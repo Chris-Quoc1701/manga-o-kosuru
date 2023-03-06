@@ -3,16 +3,20 @@ import json
 import os
 import random
 import time
-import yaml
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import yaml
 from requests_html import HTMLSession
+from utils import reduce_size_image
 
 FOLDER_STORAGE = "storages"
 PATH_STORAGE = os.path.join(os.getcwd(), FOLDER_STORAGE)
 
+PATH_PROJECT = os.path.dirname(os.path.dirname(os.getcwd()))
+PATH_CONFIG = os.path.join(PATH_PROJECT, "general_config")
+
 # Loaded file general_config/config.yaml
-with open(os.path.join("general_config", "config.yaml"), "r") as f:
+with open(f"{PATH_CONFIG}/config.yaml", "r") as f:
     CONFIG = yaml.load(f, Loader=yaml.FullLoader)
 
 LIST_TUPLE_GENRES = CONFIG["GENRES_MANGA"]
@@ -32,7 +36,7 @@ LIST_OF_SCHEDULE = [
 
 
 class TransferDataToomics:
-    def __init__(self, email: str, password: str, name_comic: str):
+    def __init__(self, email: str, password: str, number_chapter: int):
         self.email = email
         self.password = password
         self.session = HTMLSession()
@@ -43,7 +47,8 @@ class TransferDataToomics:
             "Connection": "keep-alive",
             "Accept": "*/*",
         }
-        self.name_comic = name_comic
+        self.number_chapter = number_chapter
+        self.path_storage = PATH_STORAGE
 
     def get_folder_comic(self, comic_name: str) -> str:
         return os.path.join(PATH_STORAGE, comic_name)
@@ -107,27 +112,28 @@ class TransferDataToomics:
         return data
 
     def request_post_create_manga(self, data: dict) -> int:
-        self.headers.pop("Content-Type")
+        if self.headers.get("Content-Type"):
+            self.headers.pop("Content-Type")
         path_thumbnail = os.path.join(data["thumbnail"])
         path_cover = os.path.join(data["cover_combine"])
         genres = self.choice_genre(data["genres"])
+        # Choice 1-3 schedules
+        schedules = random.sample(LIST_OF_SCHEDULE, random.randint(1, 3))
         payload = {
             "name": data["name"],
             "summary": data["summary"],
             "genre": genres,
             "status": "published",
-            "schedules": random.choices(LIST_OF_SCHEDULE, k=random.randint(1, 3)),
+            "schedules": schedules,
         }
         print("Create manga: ", data["name"])
-        files = [
-            ("thumbnail", ("thumbnail.jpg", open(path_thumbnail, "rb"), "image/jpeg")),
-            (
-                "vertical_thumbnail",
-                ("thumbnail.jpg", open(path_thumbnail, "rb"), "image/jpeg"),
-            ),
-            ("cover", ("thumbnail.jpg", open(path_cover, "rb"), "image/jpeg")),
-            ("mobile_cover", ("thumbnail.jpg", open(path_cover, "rb"), "image/jpeg")),
-        ]
+        files = {
+            "thumbnail": ("thumbnail.jpg", open(path_thumbnail, "rb"), "image/jpeg"),
+            "vertical_thumbnail": "",
+            "cover": ("cover_combine.jpg", open(path_cover, "rb"), "image/jpeg"),
+            "mobile_cover": "",
+        }
+
         response = self.session.post(
             API_MANGA, data=payload, headers=self.headers, files=files, timeout=(10, 20)
         )
@@ -167,8 +173,6 @@ class TransferDataToomics:
     ) -> int:
         dict_media = {}
         basename = os.path.basename(path_image)
-        # reduce size image
-        # reduce_size_image(path_image)
         payload = {
             "chapter": id_chapter,
         }
@@ -247,125 +251,132 @@ class TransferDataToomics:
         data = {}
         # login for access token and set header
         refresh_token = self.login_get_access_token()
-        # print(self.headers)
-        # get path to comic
-        path_comic = self.get_folder_comic(self.name_comic)
-        # get data comic
-        data_comic = self.data_comic_json(path_comic)
-        # path to chapters
-        folders_chapter = self.get_folders_chapter(self.name_comic)
-        total_chapter = len(folders_chapter)
-        # path to thumbnail of comic
-        path_thumbnail = os.path.join(path_comic, "thumbnail.jpg")
-        path_cover_combine = os.path.join(path_comic, "cover_combine.jpg")
-        self.path_comic = path_comic
-        data_comic["thumbnail"] = path_thumbnail
-        data_comic["cover_combine"] = path_cover_combine
-        # save progess upload
-        file_name = "upload.json"
-        # check file upload.json exist for get manga id if not create new manga
-        if os.path.exists(os.path.join(path_comic, file_name)):
-            with open(os.path.join(path_comic, file_name), "r") as f:
-                data = json.load(f)
-            manga_id = data[f"{self.name_comic}"]["manga_id"]
-            print("Path: ", os.path.join(path_comic, file_name))
-        else:
-            print("Here")
-            manga_id = self.request_post_create_manga(data_comic)
-            data[f"{self.name_comic}"] = {
-                "manga_id": manga_id,
-                "total_chapter": total_chapter,
-                "total_chapter_uploaded": 0,
-            }
-            with open(os.path.join(path_comic, file_name), "w") as f:
-                json.dump(data, f)
-        print("Manga id: ", manga_id)
-        # check comic is upload complete
-        if (
-            data[f"{self.name_comic}"]["total_chapter"]
-            == data[f"{self.name_comic}"]["total_chapter_uploaded"]
-        ):
-            print("Comic is upload complete!")
-            return True
+        # Get list folder comic
+        list_folder_comic = os.listdir(self.path_storage)
+        for folder_comic in list_folder_comic:
+            self.name_comic = os.path.basename(folder_comic)
+            # get path to comic
+            path_comic = self.get_folder_comic(self.name_comic)
+            # get data comic
+            data_comic = self.data_comic_json(path_comic)
+            # path to chapters
+            folders_chapter = self.get_folders_chapter(self.name_comic)
+            total_chapter = len(folders_chapter)
+            # path to thumbnail of comic
+            path_thumbnail = os.path.join(path_comic, "thumbnail.jpg")
+            path_thumbnail = reduce_size_image(path_image=path_thumbnail)
+            path_cover_combine = os.path.join(path_comic, "cover_combine.jpg")
+            self.path_comic = path_comic
+            data_comic["thumbnail"] = path_thumbnail
+            data_comic["cover_combine"] = (
+                path_cover_combine if path_cover_combine else ""
+            )
+            # save progess upload
+            file_name = "upload.json"
+            # check file upload.json exist for get manga id if not create new manga
+            if os.path.exists(os.path.join(path_comic, file_name)):
+                with open(os.path.join(path_comic, file_name), "r") as f:
+                    data = json.load(f)
+                manga_id = data[f"{self.name_comic}"]["manga_id"]
+            else:
+                manga_id = self.request_post_create_manga(data_comic)
+                data[f"{self.name_comic}"] = {
+                    "manga_id": manga_id,
+                    "total_chapter": total_chapter,
+                    "total_chapter_uploaded": 0,
+                }
+                with open(os.path.join(path_comic, file_name), "w") as f:
+                    json.dump(data, f)
+            print("Manga id: ", manga_id)
+            # check comic is upload complete
+            if (
+                data[f"{self.name_comic}"]["total_chapter"]
+                == data[f"{self.name_comic}"]["total_chapter_uploaded"]
+            ):
+                print("Comic is upload complete!")
+                return True
 
-        # Load index chapter
-        index_chapter = data[f"{self.name_comic}"]["total_chapter_uploaded"]
-        # Get folders chapter
-        folders_chapter = self.get_folders_chapter(self.name_comic)
-        for index, folder_chapter in enumerate(
-            folders_chapter[index_chapter:], start=index_chapter
-        ):
-            if index > 5:
-                break
-            # loaded chapter.json
-            chapter = self.data_chapter_json(os.path.join(path_comic, folder_chapter))
-            chapter_name = f'{chapter["name"]}'
-            path_chapter = os.path.join(path_comic, folder_chapter)
-            # path thumbnail in chapters
-            path_thumbnail = os.path.join(path_chapter, "thumbnail.jpg")
-            images = self.get_all_images(path_chapter)
-            total_images = len(images)
-            media_order = []
+            # Load index chapter
+            index_chapter = data[f"{self.name_comic}"]["total_chapter_uploaded"]
+            # Get folders chapter
+            folders_chapter = self.get_folders_chapter(self.name_comic)
+            for index, folder_chapter in enumerate(
+                folders_chapter[index_chapter:], start=index_chapter
+            ):
+                if index > self.number_chapter:
+                    break
+                # loaded chapter.json
+                chapter = self.data_chapter_json(
+                    os.path.join(path_comic, folder_chapter)
+                )
+                chapter_name = f'{chapter["name"]}'
+                path_chapter = os.path.join(path_comic, folder_chapter)
+                # path thumbnail in chapters
+                path_thumbnail = os.path.join(path_chapter, "thumbnail.jpg")
+                path_thumbnail = reduce_size_image(path_image=path_thumbnail)
+                images = self.get_all_images(path_chapter)
+                total_images = len(images)
+                media_order = []
 
-            # check chapter is upload complete if not create new chapter
-            if os.path.exists(os.path.join(path_chapter, "upload.json")):
-                with open(os.path.join(path_chapter, "upload.json"), "r") as f:
-                    data_chapter = json.load(f)
-                if data_chapter[f"{folder_chapter}"]["is_upload_complete"]:
+                # check chapter is upload complete if not create new chapter
+                if os.path.exists(os.path.join(path_chapter, "upload.json")):
+                    with open(os.path.join(path_chapter, "upload.json"), "r") as f:
+                        data_chapter = json.load(f)
+                    if data_chapter[f"{folder_chapter}"]["is_upload_complete"]:
+                        print(f"Chapter {index} is upload complete!")
+                        continue
+                    else:
+                        id_chapter = data_chapter[f"{folder_chapter}"]["id_chapter"]
+                else:
+                    id_chapter = self.request_post_create_chapter(
+                        id_manga=manga_id,
+                        chapter_name=chapter_name,
+                        path_thumbnail=path_thumbnail,
+                        index=index,
+                    )
+                    data_chapter = {
+                        f"{folder_chapter}": {
+                            "id_chapter": id_chapter,
+                            "total_images": total_images,
+                            "media_order": media_order,
+                            "is_upload_complete": False,
+                        }
+                    }
+                    with open(os.path.join(path_chapter, "upload.json"), "w") as f:
+                        json.dump(data_chapter, f)
+                # check chapter is upload complete
+                if data_chapter[f"{folder_chapter}"]["total_images"] == len(
+                    data_chapter[f"{folder_chapter}"]["media_order"]
+                ):
                     print(f"Chapter {index} is upload complete!")
                     continue
-                else:
-                    id_chapter = data_chapter[f"{folder_chapter}"]["id_chapter"]
-            else:
-                id_chapter = self.request_post_create_chapter(
-                    id_manga=manga_id,
-                    chapter_name=chapter_name,
-                    path_thumbnail=path_thumbnail,
-                    index=index,
+                # loaded index image
+                index_image = len(data_chapter[f"{folder_chapter}"]["media_order"])
+                # get images
+                images = images[index_image:]
+                # upload images
+                dict_upload = self.multi_thread_upload(id_chapter, images, path_chapter)
+                # sort dict upload
+                dict_upload_sorted = dict(
+                    sorted(dict_upload.items(), key=lambda item: item[0])
                 )
-                data_chapter = {
-                    f"{folder_chapter}": {
-                        "id_chapter": id_chapter,
-                        "total_images": total_images,
-                        "media_order": media_order,
-                        "is_upload_complete": False,
-                    }
-                }
+                # get media order
+                media_order = [value for value in dict_upload_sorted.values()]
+                # update data chapter
+                data_chapter[f"{folder_chapter}"]["media_order"] = media_order
+                data_chapter[f"{folder_chapter}"]["is_upload_complete"] = True
+                # update data comic
+                data[f"{self.name_comic}"]["total_chapter_uploaded"] += 1
+                # save data chapter
                 with open(os.path.join(path_chapter, "upload.json"), "w") as f:
                     json.dump(data_chapter, f)
-            # check chapter is upload complete
-            if data_chapter[f"{folder_chapter}"]["total_images"] == len(
-                data_chapter[f"{folder_chapter}"]["media_order"]
-            ):
-                print(f"Chapter {index} is upload complete!")
-                continue
-            # loaded index image
-            index_image = len(data_chapter[f"{folder_chapter}"]["media_order"])
-            # get images
-            images = images[index_image:]
-            # upload images
-            dict_upload = self.multi_thread_upload(id_chapter, images, path_chapter)
-            # sort dict upload
-            dict_upload_sorted = dict(
-                sorted(dict_upload.items(), key=lambda item: item[0])
-            )
-            # get media order
-            media_order = [value for value in dict_upload_sorted.values()]
-            # update data chapter
-            data_chapter[f"{folder_chapter}"]["media_order"] = media_order
-            data_chapter[f"{folder_chapter}"]["is_upload_complete"] = True
-            # update data comic
-            data[f"{self.name_comic}"]["total_chapter_uploaded"] += 1
-            # save data chapter
-            with open(os.path.join(path_chapter, "upload.json"), "w") as f:
-                json.dump(data_chapter, f)
-            # save data comic
-            with open(os.path.join(path_comic, file_name), "w") as f:
-                json.dump(data, f)
-            # update media order
-            self.request_post_update_chapter(
-                id_chapter=id_chapter, media_order=media_order
-            )
-            print(f"Chapter {index + 1} is upload complete!")
-            time.sleep(20)
-        print("Comic is upload complete!")
+                # save data comic
+                with open(os.path.join(path_comic, file_name), "w") as f:
+                    json.dump(data, f)
+                # update media order
+                self.request_post_update_chapter(
+                    id_chapter=id_chapter, media_order=media_order
+                )
+                print(f"Chapter {index + 1} is upload complete!")
+                time.sleep(12)
+            print("Comic is upload complete!")
